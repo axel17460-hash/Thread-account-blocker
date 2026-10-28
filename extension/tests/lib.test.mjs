@@ -105,6 +105,17 @@ test('runBlocks : limite et pauses entre appels uniquement', async () => {
   assert.deepEqual(h.sleeps, [7500, 7500]);
 });
 
+test('runBlocks : pas de pause ni de place dans le plafond pour un compte déjà bloqué ou introuvable', async () => {
+  const h = harness({ b: STATUS.ALREADY_BLOCKED, c: STATUS.NOT_FOUND });
+  const s = await runBlocks({
+    handles: ['a', 'b', 'c', 'd', 'e'], results: {}, block: h.block, sleep: h.sleep, limit: 2, delay: [5, 10], rng: () => 0.5,
+  });
+  // a (pause) b, c (sans pause) d, puis plafond de 2 vrais blocages atteint avant e.
+  assert.deepEqual(h.calls, ['a', 'b', 'c', 'd']);
+  assert.deepEqual(h.sleeps, [7500]);
+  assert.equal(s.remaining, 1);
+});
+
 test('runBlocks : arrêt après des échecs consécutifs, remis à zéro par un succès', async () => {
   const fail = { a: STATUS.FAILED, b: STATUS.FAILED, c: STATUS.FAILED };
   const h1 = harness(fail);
@@ -125,6 +136,16 @@ test('runBlocks : session expirée = arrêt sans rien enregistrer pour ce compte
   const s = await runBlocks({ handles: ['a', 'b', 'c'], results, block: h.block, sleep: h.sleep });
   assert.match(s.aborted, /session Threads/);
   assert.equal(s.remaining, 2);
+  assert.deepEqual(Object.keys(results), ['a']);
+});
+
+test('runBlocks : limitation par Threads = arrêt sans rien enregistrer pour ce compte', async () => {
+  const h = harness({ b: STATUS.RATE_LIMITED });
+  const results = {};
+  const s = await runBlocks({ handles: ['a', 'b', 'c'], results, block: h.block, sleep: h.sleep });
+  assert.match(s.aborted, /limite les blocages/);
+  assert.equal(s.remaining, 2);
+  assert.deepEqual(h.calls, ['a', 'b']);
   assert.deepEqual(Object.keys(results), ['a']);
 });
 

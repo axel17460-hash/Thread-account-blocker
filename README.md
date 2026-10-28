@@ -1,6 +1,6 @@
 # La Blocklist
 
-**Une extension Chrome pour ignorer les comptes de votre liste sur Threads et Instagram : leurs
+**Une extension Chrome et Firefox pour ignorer les comptes de votre liste sur Threads et Instagram : leurs
 publications restent dans votre fil, mais vous ne les voyez plus et ne pouvez plus interagir avec.**
 
 ## Pourquoi ignorer plutôt que bloquer ?
@@ -64,6 +64,21 @@ Cliquez sur l'icône La Blocklist : la page de l'outil s'ouvre.
 
 > Au démarrage, Chrome peut afficher un avertissement sur les « extensions en mode développeur » :
 > c'est normal pour une extension installée de cette façon.
+
+### Sous Firefox (version 140 ou plus récente)
+
+Le même zip fonctionne dans Firefox. Mais Firefox n'installe durablement que les extensions signées
+par Mozilla :
+
+- **Pour essayer** : tapez `about:debugging#/runtime/this-firefox`, cliquez sur **Charger un module
+  complémentaire temporaire…** et choisissez le fichier `manifest.json` du dossier décompressé.
+  L'extension disparaît à la fermeture de Firefox : il faut la recharger à chaque fois.
+- **Pour l'installer durablement** : il faut un fichier `.xpi` signé par Mozilla (voir « Pour les
+  développeurs »). Ouvrez-le dans Firefox et acceptez l'installation.
+
+Ensuite, épinglez La Blocklist depuis le menu des extensions (icône puzzle 🧩), connectez-vous sur
+instagram.com et/ou threads.com dans ce Firefox, puis cliquez sur l'icône. Si Firefox demande
+l'accès à threads.com et instagram.com, accordez-le : sans lui, l'extension ne peut rien faire.
 
 ## 2. Utiliser
 
@@ -155,15 +170,21 @@ compte de votre fil : c'est plus radical que l'ignorer.
    liste déjà appliquée sur Threads peut ensuite l'être sur Instagram.
 2. Laissez les pauses par défaut et le maximum par session : 8 à 20 secondes et 100 comptes sur
    Threads ; **30 à 60 secondes et 30 comptes sur Instagram**, qui limite davantage l'automatisation.
-3. Cliquez sur **Démarrer** et confirmez.
-4. Sur Threads, l'extension lit d'abord vos **profils bloqués** dans les réglages (un onglet passe au
-   premier plan quelques secondes, environ 25 s pour 500 comptes) : les comptes de la liste que vous
-   bloquez déjà sont marqués « déjà bloqué » sans visiter leur profil. Pour une toute petite liste,
-   vous pouvez décocher l'option « Lire d'abord mes profils bloqués ». Sur Instagram, chaque profil
+   Pauses et maximum ne comptent que les vrais blocages : un compte déjà bloqué ou introuvable est
+   passé sans attendre.
+3. Sur Threads, laissez cochée l'option **utiliser l'API interne** : l'extension envoie directement
+   à Threads les mêmes requêtes que son site, au lieu de charger chaque profil et d'y cliquer
+   (environ 3 secondes par compte, hors pauses). Quand l'API ne suffit pas (compte déjà bloqué ou
+   introuvable, réponse inattendue), l'extension passe automatiquement par l'interface.
+4. Cliquez sur **Démarrer** et confirmez.
+5. Sur Threads, l'extension lit d'abord vos **profils bloqués** (quelques secondes via l'API ; sans
+   l'API, un onglet passe au premier plan sur les réglages, environ 25 s pour 500 comptes) : les
+   comptes de la liste que vous bloquez déjà sont marqués « déjà bloqué » sans visiter leur profil.
+   Vous pouvez décocher l'option « Lire d'abord mes profils bloqués ». Sur Instagram, chaque profil
    est vérifié un par un.
-5. Un onglet passe ensuite d'un profil à l'autre pour les comptes restants. **Laissez la page
-   La Blocklist ouverte et ne touchez pas à cet onglet** tant que le traitement n'est pas terminé :
-   y cliquer ou y naviguer peut faire échouer des blocages.
+6. Un onglet de travail traite ensuite les comptes restants. **Laissez la page La Blocklist ouverte
+   et ne touchez pas à cet onglet** tant que le traitement n'est pas terminé : y cliquer ou y
+   naviguer peut faire échouer des blocages.
 
 Chaque compte affiche son résultat :
 
@@ -192,10 +213,11 @@ Pour débloquer, passez par le profil du compte (bouton « Débloquer ») ou par
 ### Exporter vos blocages (pour les sauvegarder ou les partager)
 
 Dans **3. Exporter mes blocages actuels**, choisissez le format (`.txt` conseillé) et cliquez sur
-**Exporter**. Un onglet Threads s'ouvre sur *Réglages › Confidentialité › Profils bloqués*, la
-liste défile toute seule, puis un fichier `la-blocklist-bloques-AAAA-MM-JJ.txt` est téléchargé.
-Comptez environ 25 secondes pour 500 comptes. **Ne touchez à rien pendant ce temps** : ni à l'onglet
-Threads, ni à la souris dessus. Pendant toute l'opération, l'onglet Threads est recouvert d'un voile
+**Exporter**. Avec l'option API (par défaut), la liste *Profils bloqués* est lue en quelques
+secondes, sans ouvrir les réglages. Sinon, ou si l'API ne répond pas comme prévu, un onglet Threads
+s'ouvre sur *Réglages › Confidentialité › Profils bloqués* et la liste défile toute seule (environ
+25 secondes pour 500 comptes). Un fichier `la-blocklist-bloques-AAAA-MM-JJ.txt` est ensuite
+téléchargé. **Ne touchez à rien pendant ce temps** : ni à l'onglet Threads, ni à la souris dessus. Pendant toute l'opération, l'onglet Threads est recouvert d'un voile
 « La Blocklist travaille dans cet onglet : ne touchez à rien » qui affiche l'étape en cours et bloque
 les clics et le défilement ; la page La Blocklist affiche le même avancement en haut.
 
@@ -209,8 +231,11 @@ C'est ce fichier que vous envoyez à quelqu'un pour qu'il bloque les mêmes comp
   « Réessayez plus tard ») : gardez les pauses et le maximum par session, et arrêtez pour la journée
   si Instagram affiche ce message.
 - **Relisez une liste reçue** avant de l'appliquer. Débloquer se fait un compte à la fois.
-- **Arrêt automatique** après 5 échecs de suite, ou si votre session Threads a expiré : reconnectez-vous
-  sur threads.com, puis relancez.
+- **Arrêt automatique** après 5 échecs de suite, si votre session Threads a expiré (reconnectez-vous
+  sur threads.com, puis relancez), ou dès que Threads signale qu'il limite vos blocages : attendez
+  alors quelques heures avant de relancer.
+- Un compte bloqué l'est comme depuis Threads : le blocage s'étend aux autres comptes que la personne
+  pourrait avoir.
 - L'extension a été vérifiée sur le vrai Threads et le vrai Instagram (interface en français,
   octobre 2026). Si l'un d'eux change son site, une étape peut se mettre à échouer : signalez-le dans les
   [Issues](https://github.com/axel17460-hash/Thread-account-blocker/issues).
@@ -238,6 +263,9 @@ dans `chrome://extensions` cliquez sur la flèche ↻ de la carte La Blocklist.
 Le code de l'extension est dans [`extension/`](extension/) (Manifest V3, sans dépendance) :
 
 - `app.html` / `app.js` : la page de l'outil ;
+- `api.js` : sur Threads, le blocage et la lecture de « Profils bloqués » via l'API GraphQL interne,
+  injectés dans le monde de la page pour passer par le moteur réseau du site (voir
+  [docs/threads-api-recon.md](docs/threads-api-recon.md)) ;
 - `content.js` : le script injecté dans Threads ; tous les libellés repérés (« Plus », « Bloquer »,
   « Profils bloqués »…) sont regroupés en tête de fichier ;
 - `lib.js` : la logique pure (lecture des listes, reprise, plafond).
@@ -245,10 +273,26 @@ Le code de l'extension est dans [`extension/`](extension/) (Manifest V3, sans d�
 ```bash
 node --test extension/tests/lib.test.mjs   # logique pure
 node extension/tests/e2e.mjs               # extension chargée dans Chromium face à un faux Threads local
+node extension/tests/e2e-firefox.mjs       # la même chose, en plus court, dans Firefox
 ```
 
-Le test de bout en bout a besoin du paquet npm `playwright`, de son Chromium et d'`openssl`. Il
-vérifie la mécanique, pas les libellés du vrai Threads.
+Les deux tests de bout en bout partagent le faux Threads de `tests/fake-threads.mjs` et ont besoin
+d'`openssl`. Celui de Chromium demande le paquet npm `playwright` et son Chromium. Celui de Firefox
+n'a pas de dépendance : il pilote Firefox 140+ en WebDriver BiDi (`FIREFOX=/chemin/firefox` pour
+choisir le binaire). Ils vérifient la mécanique, pas les libellés du vrai Threads.
+
+Le même dossier sert aux deux navigateurs : `background.scripts` est utilisé par Firefox et ignoré
+par Chrome, qui prend `background.service_worker`. `browser_specific_settings.gecko` donne à Firefox
+l'identifiant de l'extension, sa version minimale (140, pour `world: 'MAIN'` et la déclaration de
+collecte de données, ici « aucune ») et ne gêne pas Chrome.
+
+Pour signer une version Firefox (un compte addons.mozilla.org et ses clés d'API sont nécessaires ;
+`--channel unlisted` donne un `.xpi` à distribuer soi-même, sans fiche sur le site de Mozilla) :
+
+```bash
+npx web-ext lint --source-dir extension --ignore-files 'tests/**'
+npx web-ext sign --source-dir extension --ignore-files 'tests/**' --channel unlisted --api-key … --api-secret …
+```
 
 Pour créer le zip d'une release :
 

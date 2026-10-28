@@ -9,26 +9,28 @@ const $ = (id) => document.getElementById(id);
 // --- Stockage (chrome.storage.local) : liste, progression et réglages survivent à la fermeture ---
 
 // Réseaux pris en charge, chacun avec sa progression. Instagram limite davantage l'automatisation :
-// pauses plus longues et plafond plus bas par défaut. La lecture préalable des profils bloqués
-// n'existe que pour Threads.
+// pauses plus longues et plafond plus bas par défaut. La lecture préalable des profils bloqués et
+// le passage par l'API interne (api.js) n'existent que pour Threads.
 const PLATFORMS = {
   threads: {
-    name: 'Threads', profileUrl: (h) => `${THREADS}/@${h}`, results: 'results', precheck: true,
+    name: 'Threads', profileUrl: (h) => `${THREADS}/@${h}`, results: 'results', precheck: true, api: true,
     defaults: { min: 8, max: 20, limit: 100 },
   },
   instagram: {
     name: 'Instagram', profileUrl: (h) => `https://www.instagram.com/${h}/`, results: 'resultsInstagram', precheck: false,
-    defaults: { min: 30, max: 60, limit: 30 },
+    api: false, defaults: { min: 30, max: 60, limit: 30 },
   },
 };
 
 // `excluded` : comptes décochés dans la liste, qui ne seront pas bloqués.
 // `settings.precheck` : lire d'abord la liste « Profils bloqués » pour sauter les comptes déjà bloqués.
+// `settings.api` : sur Threads, bloquer et lire « Profils bloqués » via l'API interne (api.js), avec
+// l'interface (content.js) en repli.
 // `starter` : état de la liste de départ, mis à jour aussi par background.js (voir refreshStarter).
 const DEFAULTS = {
   list: [], results: {}, resultsInstagram: {}, excluded: [], starter: {},
   ignore: { enabled: true }, // masquer les publications des comptes cochés (inline.js), sans bloquer
-  settings: { platform: 'threads', min: 8, max: 20, limit: 100, precheck: true },
+  settings: { platform: 'threads', min: 8, max: 20, limit: 100, precheck: true, api: true },
 };
 let store = structuredClone(DEFAULTS);
 const persist = () => chrome.storage.local.set(store);
@@ -112,6 +114,31 @@ async function callInPage(tabId, method) {
   });
   return result;
 }
+
+async function callApi(tabId, method, args) {
+  await chrome.scripting.executeScript({ target: { tabId }, world: 'MAIN', files: ['api.js'] });
+  const [{ result }] = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    func: (name, a) => globalThis.__blockedexApi[name](...a),
+    args: [method, args],
+  });
+  return result;
+}
+
+// L'API s'appelle depuis la page où se trouve l'onglet de travail ; si les modules de Threads n'y sont
+// pas chargés (page « introuvable »...), on le ramène sur l'accueil, qui les charge, et on réessaie.
+async function viaApi(method, ...args) {
+  if (workTabId === null) await openInWorkTab(`${THREADS}/`);
+  let result = await callApi(workTabId, method, args);
+  if (result?.status === 'not_ready') {
+    await openInWorkTab(`${THREADS}/`);
+    result = await callApi(workTabId, method, args);
+  }
+  return result;
+}
+
+const useApi = () => store.settings.api !== false && platform().api;
 
 // --- Interface ---
 
@@ -211,6 +238,7 @@ function refresh() {
   $('platform').disabled = !idle;
   $('platform-hint').hidden = platform().precheck;
   $('precheck').disabled = !idle || !platform().precheck;
+  $('api').disabled = !idle || !platform().api;
   $('read-following').disabled = !idle;
   $('starter-add').disabled = !idle;
   $('starter-refresh').disabled = !idle;
@@ -309,6 +337,7 @@ function readSettings() {
   const settings = {
     platform: $('platform').value,
     min: num('min', 8), max: num('max', 20), limit: num('limit', 100), precheck: $('precheck').checked,
+    api: $('api').checked,
   };
   if (settings.min > settings.max) settings.max = settings.min;
   return settings;
@@ -409,6 +438,23 @@ let running = false;
 let controller = null;
 
 async function blockOne(handle) {
+  if (useApi()) {
+    try {
+      const result = await viaApi('block', handle);
+      if (result?.status === STATUS.BLOCKED) {
+        // Le voile « ne touchez à rien » reste sur l'onglet de travail pendant la pause qui suit.
+        await callInPage(workTabId, 'cover').catch(() => {});
+        return STATUS.BLOCKED;
+      }
+      if (result?.status === STATUS.RATE_LIMITED) {
+        log(`  détail : ${result.detail}`, 'err');
+        return STATUS.RATE_LIMITED;
+      }
+      log(`  API : ${result?.detail ?? 'pas de réponse'} ; passage par l'interface`);
+    } catch (e) {
+      log(`  API : ${e.message} ; passage par l'interface`);
+    }
+  }
   try {
     const tabId = await openInWorkTab(platform().profileUrl(handle));
     const result = await callInPage(tabId, 'blockProfile');
@@ -433,7 +479,24 @@ async function readInForeground(url, method) {
     if (appTab) await chrome.tabs.update(appTab.id, { active: true }).catch(() => {});
   }
 }
-const readCurrentBlocks = () => readInForeground(PRIVACY_URL, 'exportBlocked');
+
+/**
+ * Lit « Profils bloqués » : via l'API si elle est activée (quelques secondes, onglet de travail en
+ * arrière-plan), sinon ou en cas d'échec en faisant défiler la liste dans les réglages, au premier plan.
+ */
+async function readCurrentBlocks(onFallback = () => {}) {
+  if (store.settings.api !== false) {
+    try {
+      const result = await viaApi('listBlocked');
+      if (result?.status === 'ok' || result?.status === STATUS.RATE_LIMITED) return result;
+      onFallback(result?.detail ?? 'pas de réponse');
+    } catch (e) {
+      onFallback(e.message);
+    }
+  }
+  setStep('Ouverture des réglages Threads dans un onglet (il passe au premier plan)…');
+  return readInForeground(PRIVACY_URL, 'exportBlocked');
+}
 
 /**
  * Marque « déjà bloqué » les comptes cochés présents dans vos profils bloqués, pour ne pas visiter
@@ -441,17 +504,21 @@ const readCurrentBlocks = () => readInForeground(PRIVACY_URL, 'exportBlocked');
  * s'il faut s'arrêter (session expirée).
  */
 async function skipAlreadyBlocked(handles) {
-  log('Lecture de vos profils bloqués dans les réglages Threads : un onglet passe au premier plan, n\'y touchez pas...');
-  setStep('Lecture de vos profils bloqués pour sauter ceux déjà bloqués : ouverture des réglages Threads…');
+  log('Lecture de vos profils bloqués sur Threads...');
+  setStep('Lecture de vos profils bloqués pour sauter ceux déjà bloqués…');
   let result;
   try {
-    result = await readCurrentBlocks();
+    result = await readCurrentBlocks((detail) => log(`  API : ${detail} ; lecture par l'interface (un onglet passe au premier plan, n'y touchez pas)`));
   } catch (e) {
     log(`Lecture impossible (${e.message}) : chaque profil sera vérifié.`, 'warn');
     return true;
   }
   if (result.status === STATUS.LOGIN_REQUIRED) {
     log('Arrêt : session Threads absente ou expirée : connectez-vous sur threads.com', 'warn');
+    return false;
+  }
+  if (result.status === STATUS.RATE_LIMITED) {
+    log(`Arrêt : Threads limite votre compte (${result.detail}) ; attendez quelques heures.`, 'warn');
     return false;
   }
   if (result.status !== 'ok') {
@@ -567,12 +634,15 @@ $('export-btn').addEventListener('click', async () => {
   running = true; // verrouille les autres boutons pendant l'export
   refresh();
   setStatus(status, 'Export en cours, suivez l\'avancement en haut de la page…', 'working');
-  setStep('Ouverture des réglages Threads dans un onglet (il passe au premier plan)…');
+  setStep('Lecture de vos profils bloqués…');
   progressEl = status;
+  store.settings = readSettings();
   try {
     const result = await readCurrentBlocks();
     if (result.status === STATUS.LOGIN_REQUIRED) {
       setStatus(status, 'Session Threads absente ou expirée : connectez-vous sur threads.com puis réessayez.', 'err');
+    } else if (result.status === STATUS.RATE_LIMITED) {
+      setStatus(status, `Threads limite votre compte : attendez quelques heures (${result.detail}).`, 'err');
     } else if (result.status !== 'ok') {
       setStatus(status, `Échec : ${result.detail}. Threads a peut-être changé son interface.`, 'err');
     } else if (!result.handles.length) {
@@ -719,6 +789,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   $('max').value = store.settings.max;
   $('limit').value = store.settings.limit;
   $('precheck').checked = store.settings.precheck !== false; // absent des réglages des versions précédentes
+  $('api').checked = store.settings.api !== false;
   $('ignore-on').checked = store.ignore.enabled !== false;
   renderIgnore();
   renderChecklist();

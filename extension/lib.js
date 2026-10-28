@@ -6,6 +6,7 @@ export const STATUS = {
   NOT_FOUND: 'not_found',
   FAILED: 'failed',
   LOGIN_REQUIRED: 'login_required',
+  RATE_LIMITED: 'rate_limited',
 };
 
 // Ces comptes ne sont pas retraités à la prochaine exécution ; les échecs si.
@@ -194,7 +195,8 @@ export function writeBlocklist(handles, format, date = new Date()) {
 /**
  * Applique les blocages un par un. `block(handle)` renvoie un STATUS ; `results` (handle -> statut)
  * est modifié en place et `onResult` appelé après chaque compte pour pouvoir le sauvegarder.
- * `limit` plafonne les tentatives par exécution (0/null = illimité).
+ * Les pauses et le plafond `limit` (0/null = illimité) ne concernent que les vrais blocages (réussis
+ * ou échoués) : un compte déjà bloqué ou introuvable n'en déclenche pas.
  */
 export async function runBlocks({
   handles, results, block, sleep,
@@ -204,7 +206,8 @@ export async function runBlocks({
   const todo = handles.filter((h) => !isDone(results[h]));
   const summary = { counts: {}, skipped: handles.length - todo.length, remaining: 0, aborted: null };
   const abort = (reason, index) => { summary.aborted = reason; summary.remaining = todo.length - index; log(`Arrêt : ${reason}`); };
-  let attempted = 0;
+  let attempted = 0; // vrais blocages tentés
+  let pause = false;
   let consecutiveFailures = 0;
 
   for (let i = 0; i < todo.length; i++) {
@@ -214,9 +217,8 @@ export async function runBlocks({
       log(`Limite de ${limit} comptes atteinte ; relancez plus tard pour continuer.`);
       break;
     }
-    if (attempted) await sleep((delay[0] + rng() * (delay[1] - delay[0])) * 1000, signal);
+    if (pause) await sleep((delay[0] + rng() * (delay[1] - delay[0])) * 1000, signal);
     if (signal?.aborted) { abort('arrêté par vous', i); break; }
-    attempted++;
 
     let status;
     try {
@@ -229,8 +231,14 @@ export async function runBlocks({
       abort('session Threads absente ou expirée : connectez-vous sur threads.com', i);
       break;
     }
+    if (status === STATUS.RATE_LIMITED) {
+      abort('Threads limite les blocages sur votre compte : attendez quelques heures avant de relancer', i);
+      break;
+    }
     results[handle] = status;
     summary.counts[status] = (summary.counts[status] || 0) + 1;
+    pause = status === STATUS.BLOCKED || status === STATUS.FAILED;
+    if (pause) attempted++;
     await onResult(handle, status, i, todo.length);
 
     consecutiveFailures = status === STATUS.FAILED ? consecutiveFailures + 1 : 0;

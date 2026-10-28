@@ -1,6 +1,6 @@
 # La Blocklist
 
-Extension Chrome pour bloquer d'un coup une liste de comptes Threads ou Instagram, à commencer par la
+Extension Chrome et Firefox pour bloquer d'un coup une liste de comptes Threads ou Instagram, à commencer par la
 liste de départ « On bloque l'extrême droite », et pour exporter vos propres blocages.
 
 ## Installer
@@ -21,3 +21,8 @@ liste de départ « On bloque l'extrême droite », et pour exporter vos propres
 
 Guide complet, conseils et problèmes fréquents :
 https://github.com/axel17460-hash/Thread-account-blocker#readme
+
+Sous Firefox (140 ou plus récent) : `about:debugging#/runtime/this-firefox` › **Charger un module
+complémentaire temporaire…** › choisissez `manifest.json` dans ce dossier. L'installation dure
+jusqu'à la fermeture de Firefox ; pour une installation durable, il faut une version signée par
+Mozilla (`.xpi`).

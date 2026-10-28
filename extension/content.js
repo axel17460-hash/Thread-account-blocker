@@ -356,6 +356,8 @@
       'Compte traité. Pause avant le compte suivant : ne touchez toujours à rien.'),
     exportBlocked: withOverlay(exportBlocked, 'Lecture de vos profils bloqués…'),
     readFollowing: withOverlay(readFollowing, 'Lecture des abonnements de ce compte…'),
+    // Blocages via l'API (api.js) : l'onglet ne fait rien lui-même, mais garde le voile pendant la série.
+    cover: async () => showOverlay('Blocages en cours via l\'API de Threads : ne touchez à rien.'),
     release: hideOverlay,
   };
 })();

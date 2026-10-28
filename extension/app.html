@@ -98,7 +98,8 @@
         <label>Pause max (s) <input type="number" id="max" min="0" step="1" value="20"></label>
         <label>Max par session <input type="number" id="limit" min="0" step="10" value="100"></label>
       </div>
-      <label class="check"><input type="checkbox" id="precheck" checked> Lire d'abord mes profils bloqués pour sauter ceux déjà bloqués (recommandé ; environ 25 s pour 500 comptes)</label>
+      <label class="check"><input type="checkbox" id="precheck" checked> Lire d'abord mes profils bloqués pour sauter ceux déjà bloqués (recommandé ; quelques secondes via l'API, sinon environ 25 s pour 500 comptes)</label>
+      <label class="check"><input type="checkbox" id="api" checked> Threads : utiliser l'API interne pour bloquer et lire mes profils bloqués (plus rapide) ; l'interface reste utilisée en repli</label>
       <p class="hint">Les pauses et le plafond limitent le risque de restriction de votre compte. Laissez cette page ouverte pendant le traitement ; un onglet Threads de travail s'ouvre en arrière-plan : n'y touchez pas tant que le traitement n'est pas terminé.</p>
       <div class="row">
         <button id="start" class="primary" disabled>Démarrer</button>

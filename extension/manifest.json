@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "La Blocklist",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Masquez (ou bloquez) sur Threads et Instagram les comptes de la liste « On bloque l'extrême droite » ou de vos propres listes.",
   "permissions": ["storage", "scripting", "alarms"],
   "host_permissions": [
@@ -11,7 +11,7 @@
     "https://www.instagram.com/*",
     "https://www.onbloquelextremedroite.fr/*"
   ],
-  "background": { "service_worker": "background.js", "type": "module" },
+  "background": { "service_worker": "background.js", "scripts": ["background.js"], "type": "module" },
   "content_scripts": [
     {
       "matches": [
@@ -26,5 +26,12 @@
     }
   ],
   "action": { "default_title": "Ouvrir La Blocklist" },
-  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }
+  "icons": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "la-blocklist@thread-account-blocker",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": { "required": ["none"] }
+    }
+  }
 }
